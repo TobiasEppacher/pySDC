@@ -1,20 +1,18 @@
 from pySDC.helpers.stats_helper import get_sorted
 from pySDC.helpers.visualization_tools import show_residual_across_simulation
 
-import numpy as np
-
 from pySDC.implementations.controller_classes.controller_nonMPI import controller_nonMPI
 from pySDC.implementations.sweeper_classes.imex_1st_order_mass import imex_1st_order_mass
-
 from pySDC.projects.TobiasTests.Fenics_Heat_2D_custom import fenics_heat_2d_custom, MeshType, Equation
 
+import logging
+import pandas as pd
+import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
 
-from dolfin import *
-
-import logging
 from pathlib import Path
+from dolfin import *
 
 def get_residuals(stats):
     residuals = []
@@ -26,7 +24,7 @@ def get_residuals(stats):
     return residuals
     
 
-def problem_setup(t0, dt, nspace, restol, mesh_type, equation):
+def problem_setup(t0, dt, nspace, maxiter, restol, mesh_type, equation):
     # initialize level parameters
     level_params = dict()
     level_params['restol'] = restol
@@ -34,7 +32,7 @@ def problem_setup(t0, dt, nspace, restol, mesh_type, equation):
     
     # initialize step parameters
     step_params = dict()
-    step_params['maxiter'] = 10
+    step_params['maxiter'] = maxiter
 
     # initialize sweeper parameters
     sweeper_params = dict()
@@ -83,8 +81,8 @@ def main():
     vmin = 1.0
     vmax = 7.0
     
-    # Print residuals to file and residual plot (only use if plotting = False to avoid corrupting the plots)
-    print_residuals = True
+    # Saves statistics about the execution to a file
+    save_statistics = True
     
     # Basic parameters for the simulation
     # For more detailed parameters, adjust the problem_setup function
@@ -92,12 +90,13 @@ def main():
     Tend = 1.0
     dt_arr = [0.5, 0.25, 0.125, 0.0625, 0.03125]
     nspace = 8
+    maxiter = 1
     restol = 1e-15
     mesh_type = MeshType.UNIT_SQUARE
     equation = Equation.POLY_N
     
     
-    description, controller_params = problem_setup(t0=t0, dt=dt_arr[0], nspace=nspace, restol=restol, mesh_type=mesh_type, equation=equation)
+    description, controller_params = problem_setup(t0=t0, dt=dt_arr[0], nspace=nspace, maxiter=maxiter, restol=restol, mesh_type=mesh_type, equation=equation)
     
     print(f'\nRunning with mesh type {mesh_type.name} and equation {equation.name}')
     print(f'Mesh size parameter: {nspace}')
@@ -106,39 +105,67 @@ def main():
     for dt in dt_arr:
         description['level_params']['dt'] = dt
         print(f'\nTime step size dt={dt}')
+
+        final_statistics = {}
+        final_statistics['t_start'] = []
+        final_statistics['t_end'] = []
+        final_statistics['residual'] = []
+        final_statistics['err'] = []
+        final_statistics['iter_mean'] = []
+        final_statistics['iter_range'] = []
+        final_statistics['iter_max_index'] = []
+        final_statistics['iter_min_index'] = []
+        final_statistics['iter_std'] = []
+        final_statistics['iter_var'] = []
+        final_statistics['time_to_solution'] = []
+        
+        residual_list = []
         
         controller = controller_nonMPI(num_procs=1, controller_params=controller_params, description=description)
         P = controller.MS[0].levels[0].prob
+        print(f'Fenics DoFs: {P.getDofCount()}')
+        
         uinit = P.u_exact(t0)
+        
+        ex_solution_arr = [uinit]
+        solution_arr = [uinit]
         
         if plotting:
             fig = plt.figure(figsize=(5, 10))
             fig.add_subplot(3,1,1)
             p = plot(uinit.values, title='Initial condition', vmin=vmin, vmax=vmax, cmap='coolwarm')
             fig.colorbar(p)
-        
-        uend, stats = controller.run(u0=uinit, t0=t0, Tend=Tend)
-        
-        uex = P.u_exact(Tend)
-        err = abs(uex - uend) / abs(uex)
-        out = f' -- error at time {Tend}: {err}'
-        print(out)
-        
-        iter_counts = get_sorted(stats, type='niter', sortby='time')
-        niters = np.array([item[1] for item in iter_counts])
-        out = '   Mean number of iterations: %4.2f' % np.mean(niters)
-        print(out)
-        out = '   Range of values for number of iterations: %2i ' % np.ptp(niters)
-        print(out)
-        out = '   Position of max/min number of iterations: %2i -- %2i' % (int(np.argmax(niters)), int(np.argmin(niters)))
-        print(out)
-        out = '   Std and var for number of iterations: %4.2f -- %4.2f' % (float(np.std(niters)), float(np.var(niters)))
-        print(out)
-                
-        timing = get_sorted(stats, type='timing_run', sortby='time')
-        out = f'Time to solution: {timing[0][1]:6.4f} sec.'
-        print(out)
-        
+            
+        curr_t = t0
+        while curr_t < Tend:           
+            uend, stats = controller.run(u0=solution_arr[-1], t0=curr_t, Tend=curr_t+dt)
+            solution_arr.append(uend)
+            
+            uex = P.u_exact(curr_t+dt)
+            ex_solution_arr.append(uex)
+            
+            err = abs(uex - uend) / abs(uex)
+            
+            iter_counts = get_sorted(stats, type='niter', sortby='time')
+            niters = np.array([item[1] for item in iter_counts])
+            
+            residual_list.append(get_residuals(stats))
+            
+            final_statistics['t_start'].append(curr_t)
+            final_statistics['t_end'].append(curr_t + dt)
+            final_statistics['residual'].append(get_residuals(stats)[-1][2])
+            final_statistics['err'].append(err)
+            final_statistics['iter_mean'].append(np.mean(niters))
+            final_statistics['iter_range'].append(np.ptp(niters))
+            final_statistics['iter_max_index'].append(int(np.argmax(niters)))
+            final_statistics['iter_min_index'].append(int(np.argmin(niters)))
+            final_statistics['iter_std'].append(float(np.std(niters)))
+            final_statistics['iter_var'].append(float(np.var(niters)))
+            final_statistics['time_to_solution'].append(get_sorted(stats, type='timing_run', sortby='time')[0][1])
+            
+            curr_t += dt
+                    
+            
         if plotting:
             fig.add_subplot(3,1,2)
             p = plot(uend.values, title='Computed solution', vmin=vmin, vmax=vmax, cmap='coolwarm')
@@ -147,23 +174,27 @@ def main():
             p = plot(uex.values, title='Exact solution', vmin=vmin, vmax=vmax, cmap='coolwarm')
             fig.colorbar(p)
             plt.show()
-           
-        if print_residuals:
-            # Save residuals to file
+            
+        if save_statistics:
+            Path(f'pySDC/projects/TobiasTests/data/{mesh_type.name}/{equation.name}/statistics').mkdir(exist_ok=True, parents=True)
+            fname = f'pySDC/projects/TobiasTests/data/{mesh_type.name}/{equation.name}/statistics/heat_2d_{dt}step_size.csv'
+            f = open(fname, 'w')
+            
+            df = pd.DataFrame.from_dict(final_statistics)
+            df.to_csv(f, index=False)
+                
+            # Save residuals through iterations to seperate file
             Path(f'pySDC/projects/TobiasTests/data/{mesh_type.name}/{equation.name}/residual_convergence').mkdir(exist_ok=True, parents=True)
             fname = f'pySDC/projects/TobiasTests/data/{mesh_type.name}/{equation.name}/residual_convergence/heat_2d_{dt}step_size.txt'
             f = open(fname, 'w')
-            residuals = get_residuals(stats)
-            for item in residuals:
-                f.write('t: %.8f | iteration: %3i | residual: %.15f\n' % item)
-                
-            # Save residual plot
-            Path(f'pySDC/projects/TobiasTests/data/{mesh_type.name}/{equation.name}/residual_plots').mkdir(exist_ok=True, parents=True)
-            fname = f'pySDC/projects/TobiasTests/data/{mesh_type.name}/{equation.name}/residual_plots/heat_2d_{dt}step_size.png'
-            plt.figure()
-            show_residual_across_simulation(stats, fname)
+            for residuals in residual_list:
+                for iteration, item in enumerate(residuals):
+                    f.write('t: %.8f | iteration: %3i | residual: %.15f\n' % (item[0], iteration, item[2]))   
     
     return 0
+
+
+
 
 if __name__ == '__main__':
     main()

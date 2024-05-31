@@ -37,6 +37,9 @@ class fenics_heat_2d_custom(ptype):
     dtype_u = fenics_mesh
     dtype_f = rhs_fenics_mesh
     
+    def getDofCount(self):
+        return len(Function(self.V).vector()[:])
+    
     def __init__(self, mesh_type=MeshType.UNIT_SQUARE, equation=Equation.POLY ,ny=8, t0=0.0, family='CG', order=4):
         # Allow for fixing the boundary conditions for the residual computation
         # Necessary if imex-1st-order-mass is used
@@ -52,8 +55,6 @@ class fenics_heat_2d_custom(ptype):
         
         # define function space for future reference
         self.V = FunctionSpace(self.mesh, family, order)
-        tmp = Function(self.V)
-        print('DoFs:', len(tmp.vector()[:]))
         
         # invoke super init, passing number of dofs, dtype_u and dtype_f
         super(fenics_heat_2d_custom, self).__init__(self.V)
