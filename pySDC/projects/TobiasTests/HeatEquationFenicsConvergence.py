@@ -4,7 +4,7 @@ from pySDC.helpers.visualization_tools import show_residual_across_simulation
 import numpy as np
 
 from pySDC.implementations.controller_classes.controller_nonMPI import controller_nonMPI
-from pySDC.implementations.sweeper_classes.imex_1st_order import imex_1st_order
+from pySDC.implementations.sweeper_classes.imex_1st_order_mass import imex_1st_order_mass
 
 from pySDC.projects.TobiasTests.Fenics_Heat_2D_custom import fenics_heat_2d_custom, MeshType, Equation
 
@@ -61,7 +61,7 @@ def problem_setup(t0, dt, nspace, restol, mesh_type, equation):
     description = dict()
     description['problem_class'] = fenics_heat_2d_custom
     description['problem_params'] = problem_params
-    description['sweeper_class'] = imex_1st_order
+    description['sweeper_class'] = imex_1st_order_mass
     description['sweeper_params'] = sweeper_params
     description['level_params'] = level_params
     description['step_params'] = step_params
@@ -78,7 +78,12 @@ def main():
     # Suppress missing font warning
     logging.getLogger('matplotlib.font_manager').disabled = True
     
+    # Plotting parameters
     plotting = False
+    vmin = 1.0
+    vmax = 7.0
+    
+    # Print residuals to file and residual plot (only use if plotting = False to avoid corrupting the plots)
     print_residuals = True
     
     # Basic parameters for the simulation
@@ -91,9 +96,6 @@ def main():
     mesh_type = MeshType.UNIT_SQUARE
     equation = Equation.POLY_N
     
-    # Plotting parameters
-    vmin = 1.0
-    vmax = 3.2
     
     description, controller_params = problem_setup(t0=t0, dt=dt_arr[0], nspace=nspace, restol=restol, mesh_type=mesh_type, equation=equation)
     
@@ -104,6 +106,7 @@ def main():
     for dt in dt_arr:
         description['level_params']['dt'] = dt
         print(f'\nTime step size dt={dt}')
+        
         controller = controller_nonMPI(num_procs=1, controller_params=controller_params, description=description)
         P = controller.MS[0].levels[0].prob
         uinit = P.u_exact(t0)
@@ -147,15 +150,16 @@ def main():
            
         if print_residuals:
             # Save residuals to file
-            Path(f'data/convergence/{mesh_type.name}/{equation.name}').mkdir(exist_ok=True, parents=True)
-            fname = f'data/convergence/{mesh_type.name}/{equation.name}/heat_2d_{dt}step_size.txt'
+            Path(f'pySDC/projects/TobiasTests/data/{mesh_type.name}/{equation.name}/residual_convergence').mkdir(exist_ok=True, parents=True)
+            fname = f'pySDC/projects/TobiasTests/data/{mesh_type.name}/{equation.name}/residual_convergence/heat_2d_{dt}step_size.txt'
             f = open(fname, 'w')
             residuals = get_residuals(stats)
             for item in residuals:
-                f.write('t: %.8f | iteration: %3i | residual: %.13f\n' % item)
+                f.write('t: %.8f | iteration: %3i | residual: %.15f\n' % item)
                 
             # Save residual plot
-            fname = f'data/convergence/{mesh_type.name}/{equation.name}/heat_2d_{dt}step_size.png'
+            Path(f'pySDC/projects/TobiasTests/data/{mesh_type.name}/{equation.name}/residual_plots').mkdir(exist_ok=True, parents=True)
+            fname = f'pySDC/projects/TobiasTests/data/{mesh_type.name}/{equation.name}/residual_plots/heat_2d_{dt}step_size.png'
             plt.figure()
             show_residual_across_simulation(stats, fname)
     

@@ -12,7 +12,7 @@ from enum import Enum
 '''
 Enum for mesh type selection
 - UNIT_SQUARE: Unit square mesh (ny gives number of elements in each direction)
-- RECTANGLE_2x1: Rectangle mesh with 2x1 aspect ratio in elements (ny gives number of elements in y direction)
+- RECTANGLE_2x1: Rectangle mesh on domain [0,2]x[0,1] with 2x1 aspect ratio in elements (ny gives number of elements in y direction)
 '''
 class MeshType(Enum):
     UNIT_SQUARE = 1,
@@ -38,6 +38,9 @@ class fenics_heat_2d_custom(ptype):
     dtype_f = rhs_fenics_mesh
     
     def __init__(self, mesh_type=MeshType.UNIT_SQUARE, equation=Equation.POLY ,ny=8, t0=0.0, family='CG', order=4):
+        # Allow for fixing the boundary conditions for the residual computation
+        # Necessary if imex-1st-order-mass is used
+        self.fix_bc_for_residual = True
         
         # set mesh
         if mesh_type==MeshType.UNIT_SQUARE:
@@ -77,8 +80,8 @@ class fenics_heat_2d_custom(ptype):
             self.u_D = Expression('1 + x[0]*x[0] + alpha*x[1]*x[1] + beta*t', degree=self.order, alpha=self.alpha, beta=self.beta, t=t0)
         elif equation==Equation.POLY_N:
             self.d = 10
-            self.a = self.b = 2
-            self.c = 2
+            self.a = self.b = 4
+            self.c = 4
             self.u_D = df.Expression('d + pow(x[0], a) + pow(x[1], b) + pow(t, c)', degree=self.order, a=self.a, b=self.b, c=self.c, d=self.d, t=t0)
         elif equation==Equation.TRIG:
             self.u_D = Expression('sin(a*x[0])*sin(a*x[1])*cos(t)', a=np.pi, degree=self.order, t=t0)
@@ -118,49 +121,44 @@ class fenics_heat_2d_custom(ptype):
         r"""
         Dolfin's linear solver for :math:`(M - factor \cdot A) \vec{u} = \vec{rhs}`.
         """
-
-        b = self.apply_mass_matrix(rhs)
-
         u = self.dtype_u(u0)
         T = self.M - factor * self.K
-        self.u_D.t=t
+        b = self.dtype_u(rhs)
+
+        self.u_D.t = t
+
         self.bc.apply(T, b.values.vector())
+        self.bc.apply(b.values.vector())
+
         df.solve(T, u.values.vector(), b.values.vector())
 
         return u
-    
-    def __eval_fexpl(self, u, t):
-        """
-            Explicit part of the right-hand side.
-        """
-
-        self.g.t = t
-        fexpl = self.dtype_u(df.interpolate(self.g, self.V))
-
-        return fexpl
-
-    def __eval_fimpl(self, u, t):
-        """
-            Explicit part of the right-hand side.
-        """
-        
-        tmp = self.dtype_u(self.V)
-        self.K.mult(u.values.vector(), tmp.values.vector())
-        fimpl = self.__invert_mass_matrix(tmp)
-
-        return fimpl
-
 
     def eval_f(self, u, t):
         """
             The right-hand side.
         """
-
         f = self.dtype_f(self.V)
-        f.impl = self.__eval_fimpl(u, t)
-        f.expl = self.__eval_fexpl(u, t)
+
+        self.K.mult(u.values.vector(), f.impl.values.vector())
+
+        self.g.t = t
+        f.expl = self.dtype_u(df.interpolate(self.g, self.V))
+        f.expl = self.apply_mass_matrix(f.expl)
+
         return f
     
+    def fix_residual(self, res):
+        """
+        Applies homogeneous Dirichlet boundary conditions to the residual
+
+        Parameters
+        ----------
+        res : dtype_u
+              Residual
+        """
+        self.bc_hom.apply(res.values.vector())
+        return None
     
     def apply_mass_matrix(self, u):
         r"""
