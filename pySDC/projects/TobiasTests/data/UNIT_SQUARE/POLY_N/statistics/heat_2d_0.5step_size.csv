@@ -1,3 +1,0 @@
-t_start,t_end,residual,err,iter_mean,iter_range,iter_max_index,iter_min_index,iter_std,iter_var,time_to_solution
-0.0,0.5,1.31906133184114e-05,1.4409893701982094e-05,1.0,0,0,0,0.0,0.0,0.07389456000055361
-0.5,1.0,1.3738509973126165e-05,1.3420796573541138e-05,1.0,0,0,0,0.0,0.0,0.05518363199917076

@@ -24,7 +24,7 @@ def get_residuals(stats):
     return residuals
     
 
-def problem_setup(t0, dt, nspace, maxiter, restol, mesh_type, equation):
+def problem_setup(t0, dt, nspace, maxiter, restol, num_nodes, mesh_type, equation):
     # initialize level parameters
     level_params = dict()
     level_params['restol'] = restol
@@ -37,7 +37,7 @@ def problem_setup(t0, dt, nspace, maxiter, restol, mesh_type, equation):
     # initialize sweeper parameters
     sweeper_params = dict()
     sweeper_params['quad_type'] = 'RADAU-RIGHT'
-    sweeper_params['num_nodes'] = [3]
+    sweeper_params['num_nodes'] = num_nodes
 
     # initialize problem parameters
     problem_params = dict()
@@ -46,7 +46,7 @@ def problem_setup(t0, dt, nspace, maxiter, restol, mesh_type, equation):
     problem_params['t0'] = t0
     problem_params['ny'] = nspace  # number of degrees of freedom for each level
     problem_params['family'] = 'CG'
-    problem_params['order'] = [2]
+    problem_params['order'] = [4]
 
     # initialize controller parameters
     controller_params = dict()
@@ -88,38 +88,56 @@ def main():
     # For more detailed parameters, adjust the problem_setup function
     t0 = 0.0
     Tend = 1.0
-    dt_arr = [0.5, 0.25, 0.125, 0.0625, 0.03125]
+    timesteps = [2**i for i in range(2, 12)]
     nspace = 8
     maxiter = 1
     restol = 1e-15
+    num_nodes = 8
     mesh_type = MeshType.UNIT_SQUARE
-    equation = Equation.POLY_N
+    equation = Equation.TRIG
     
     
-    description, controller_params = problem_setup(t0=t0, dt=dt_arr[0], nspace=nspace, maxiter=maxiter, restol=restol, mesh_type=mesh_type, equation=equation)
+    description, controller_params = problem_setup(
+        t0=t0, 
+        dt=(Tend - t0) / timesteps[0], 
+        nspace=nspace, 
+        maxiter=maxiter, 
+        restol=restol, 
+        num_nodes=num_nodes, 
+        mesh_type=mesh_type, 
+        equation=equation)
     
     print(f'\nRunning with mesh type {mesh_type.name} and equation {equation.name}')
     print(f'Mesh size parameter: {nspace}')
     print(f'Time interval: [{t0}, {Tend}]')
     print(f'Residual tolerance: {description["level_params"]["restol"]}')
-    for dt in dt_arr:
+    
+    file_dir = f'pySDC/projects/TobiasTests/data/{mesh_type.name}/{equation.name}/order{num_nodes}'
+    
+    convergence_data = {}
+    convergence_data['timesteps'] = []
+    convergence_data['final_residual'] = []
+    convergence_data['final_error'] = []
+    
+    for timestep_count in timesteps:
+        dt = (Tend - t0) / timestep_count
         description['level_params']['dt'] = dt
-        print(f'\nTime step size dt={dt}')
+        print(f'\nNumber of time steps={timestep_count}')
+        print(f'Time step size dt={dt}')
 
-        final_statistics = {}
-        final_statistics['t_start'] = []
-        final_statistics['t_end'] = []
-        final_statistics['residual'] = []
-        final_statistics['err'] = []
-        final_statistics['iter_mean'] = []
-        final_statistics['iter_range'] = []
-        final_statistics['iter_max_index'] = []
-        final_statistics['iter_min_index'] = []
-        final_statistics['iter_std'] = []
-        final_statistics['iter_var'] = []
-        final_statistics['time_to_solution'] = []
+        full_final_statistics = {}
+        full_final_statistics['t_start'] = []
+        full_final_statistics['t_end'] = []
+        full_final_statistics['residual'] = []
+        full_final_statistics['err'] = []
+        full_final_statistics['iter_mean'] = []
+        full_final_statistics['iter_range'] = []
+        full_final_statistics['iter_max_index'] = []
+        full_final_statistics['iter_min_index'] = []
+        full_final_statistics['iter_std'] = []
+        full_final_statistics['iter_var'] = []
+        full_final_statistics['time_to_solution'] = []
         
-        residual_list = []
         
         controller = controller_nonMPI(num_procs=1, controller_params=controller_params, description=description)
         P = controller.MS[0].levels[0].prob
@@ -149,22 +167,23 @@ def main():
             iter_counts = get_sorted(stats, type='niter', sortby='time')
             niters = np.array([item[1] for item in iter_counts])
             
-            residual_list.append(get_residuals(stats))
-            
-            final_statistics['t_start'].append(curr_t)
-            final_statistics['t_end'].append(curr_t + dt)
-            final_statistics['residual'].append(get_residuals(stats)[-1][2])
-            final_statistics['err'].append(err)
-            final_statistics['iter_mean'].append(np.mean(niters))
-            final_statistics['iter_range'].append(np.ptp(niters))
-            final_statistics['iter_max_index'].append(int(np.argmax(niters)))
-            final_statistics['iter_min_index'].append(int(np.argmin(niters)))
-            final_statistics['iter_std'].append(float(np.std(niters)))
-            final_statistics['iter_var'].append(float(np.var(niters)))
-            final_statistics['time_to_solution'].append(get_sorted(stats, type='timing_run', sortby='time')[0][1])
+            full_final_statistics['t_start'].append(curr_t)
+            full_final_statistics['t_end'].append(curr_t + dt)
+            full_final_statistics['residual'].append(get_residuals(stats)[-1][2])
+            full_final_statistics['err'].append(err)
+            full_final_statistics['iter_mean'].append(np.mean(niters))
+            full_final_statistics['iter_range'].append(np.ptp(niters))
+            full_final_statistics['iter_max_index'].append(int(np.argmax(niters)))
+            full_final_statistics['iter_min_index'].append(int(np.argmin(niters)))
+            full_final_statistics['iter_std'].append(float(np.std(niters)))
+            full_final_statistics['iter_var'].append(float(np.var(niters)))
+            full_final_statistics['time_to_solution'].append(get_sorted(stats, type='timing_run', sortby='time')[0][1])
             
             curr_t += dt
-                    
+            
+        convergence_data['timesteps'].append(timestep_count)
+        convergence_data['final_residual'].append(full_final_statistics['residual'][-1])
+        convergence_data['final_error'].append(full_final_statistics['err'][-1])          
             
         if plotting:
             fig.add_subplot(3,1,2)
@@ -176,20 +195,25 @@ def main():
             plt.show()
             
         if save_statistics:
-            Path(f'pySDC/projects/TobiasTests/data/{mesh_type.name}/{equation.name}/statistics').mkdir(exist_ok=True, parents=True)
-            fname = f'pySDC/projects/TobiasTests/data/{mesh_type.name}/{equation.name}/statistics/heat_2d_{dt}step_size.csv'
+            # Save full execution statistics to seperate file for each time step count / time step size
+            # This includes data like residual, error, time to solution etc. for each time step
+            Path(f'{file_dir}/statistics').mkdir(exist_ok=True, parents=True)
+            fname = f'{file_dir}/statistics/heat_2d_{dt}step_size.csv'
             f = open(fname, 'w')
             
-            df = pd.DataFrame.from_dict(final_statistics)
+            df = pd.DataFrame.from_dict(full_final_statistics)
             df.to_csv(f, index=False)
-                
-            # Save residuals through iterations to seperate file
-            Path(f'pySDC/projects/TobiasTests/data/{mesh_type.name}/{equation.name}/residual_convergence').mkdir(exist_ok=True, parents=True)
-            fname = f'pySDC/projects/TobiasTests/data/{mesh_type.name}/{equation.name}/residual_convergence/heat_2d_{dt}step_size.txt'
-            f = open(fname, 'w')
-            for residuals in residual_list:
-                for iteration, item in enumerate(residuals):
-                    f.write('t: %.8f | iteration: %3i | residual: %.15f\n' % (item[0], iteration, item[2]))   
+        
+        
+    # Save convergence data (final residual and error for each time step count)
+    # to file for further analysis
+    if save_statistics:       
+        Path(file_dir).mkdir(exist_ok=True, parents=True)
+        fname = f'{file_dir}/convergence_data.csv'
+        f = open(fname, 'w')
+        
+        df = pd.DataFrame.from_dict(convergence_data)
+        df.to_csv(f, index=False)
     
     return 0
 

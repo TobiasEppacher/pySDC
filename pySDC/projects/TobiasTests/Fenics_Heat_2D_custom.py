@@ -43,7 +43,7 @@ class fenics_heat_2d_custom(ptype):
     def __init__(self, mesh_type=MeshType.UNIT_SQUARE, equation=Equation.POLY ,ny=8, t0=0.0, family='CG', order=4):
         # Allow for fixing the boundary conditions for the residual computation
         # Necessary if imex-1st-order-mass is used
-        self.fix_bc_for_residual = True
+        self.fix_bc_for_residual = False
         
         # set mesh
         if mesh_type==MeshType.UNIT_SQUARE:
@@ -169,20 +169,6 @@ class fenics_heat_2d_custom(ptype):
         me = self.dtype_u(self.V)
         self.M.mult(u.values.vector(), me.values.vector())
 
-        return me
-    
-    def __invert_mass_matrix(self, u):
-        r"""
-            The product :math:`M^{-1} \vec{u}`.
-        """
-
-        me = self.dtype_u(self.V)
-
-        b = self.dtype_u(u)
-        M = self.M
-        self.bc_hom.apply(M, b.values.vector())
-
-        df.solve(M, me.values.vector(), b.values.vector())
         return me
 
 
