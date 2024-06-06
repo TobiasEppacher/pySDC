@@ -3,6 +3,7 @@ from pySDC.helpers.visualization_tools import show_residual_across_simulation
 
 from pySDC.implementations.controller_classes.controller_nonMPI import controller_nonMPI
 from pySDC.implementations.sweeper_classes.imex_1st_order_mass import imex_1st_order_mass
+from pySDC.implementations.sweeper_classes.Runge_Kutta import RK4
 from pySDC.projects.TobiasTests.Fenics_Heat_2D_custom import fenics_heat_2d_custom, MeshType, Equation
 
 import logging
@@ -88,11 +89,11 @@ def main():
     # For more detailed parameters, adjust the problem_setup function
     t0 = 0.0
     Tend = 1.0
-    timesteps = [2**i for i in range(2, 12)]
+    timesteps = [2**i for i in range(2, 10)]
     nspace = 8
     maxiter = 1
     restol = 1e-15
-    num_nodes = 8
+    num_nodes = 3
     mesh_type = MeshType.UNIT_SQUARE
     equation = Equation.TRIG
     

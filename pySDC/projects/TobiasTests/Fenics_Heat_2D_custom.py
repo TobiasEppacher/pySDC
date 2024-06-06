@@ -29,7 +29,8 @@ class Equation(Enum):
     TRIG = 2,
     MIXED = 3,
     MIXED_2 = 4,
-    MIXED_3 = 5
+    MIXED_3 = 5,
+    TEST = 6
     
 
 
@@ -95,6 +96,8 @@ class fenics_heat_2d_custom(ptype):
             self.u_D = Expression('sin(a*x[0])*sin(a*x[1])*beta*t', degree=self.order, a=np.pi, beta=self.beta, t=t0)
         elif equation==Equation.MIXED_3:
             self.u_D = Expression('sin(a*x[0]) + x[1]*x[1] + t', a=np.pi, degree=self.order, t=t0)
+        elif equation==Equation.TEST:
+            self.u_D = Expression('pow(e, -a*t*t)*sin(1/sqrt(2)*a*x[0])*sin(1/sqrt(2)*a*x[1])', a=np.pi, e=np.e, degree=self.order, t=t0)
         else:
             raise ValueError('Unknown equation type')
         
@@ -117,7 +120,8 @@ class fenics_heat_2d_custom(ptype):
             self.g = df.Expression('(1 + 2*a*a)*sin(a*x[0])*sin(a*x[1])*beta*t', degree=self.order, a=np.pi, beta=self.beta, t=t0)
         elif equation==Equation.MIXED_3:
             self.g = df.Expression('a*a*sin(a*x[0]) - 1', degree=self.order, a=np.pi, t=t0)
-        
+        elif equation==Equation.TEST:
+            self.g = df.Expression('0', degree=self.order, t=t0)
     def solve_system(self, rhs, factor, u0, t):
         r"""
         Dolfin's linear solver for :math:`(M - factor \cdot A) \vec{u} = \vec{rhs}`.
@@ -185,6 +189,8 @@ class fenics_heat_2d_custom(ptype):
             u_exact = Expression('sin(a*x[0])*sin(a*x[1])*beta*t', degree=self.order, a=np.pi, beta=self.beta, t=t)
         elif self.equation==Equation.MIXED_3:
             u_exact = Expression('sin(a*x[0]) + x[1]*x[1] + t', a=np.pi, degree=self.order, t=t)
+        elif self.equation==Equation.TEST:
+            u_exact = Expression('pow(e, -a*t*t)*sin(1/sqrt(2)*a*x[0])*sin(1/sqrt(2)*a*x[1])', a=np.pi, e=np.e, degree=self.order, t=t)
         else:
             raise ValueError('Unknown equation type')
         
