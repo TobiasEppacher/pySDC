@@ -44,7 +44,7 @@ class fenics_heat_2d_custom(ptype):
     def __init__(self, mesh_type=MeshType.UNIT_SQUARE, equation=Equation.POLY ,ny=8, t0=0.0, family='CG', order=4):
         # Allow for fixing the boundary conditions for the residual computation
         # Necessary if imex-1st-order-mass is used
-        self.fix_bc_for_residual = False
+        self.fix_bc_for_residual = True
         
         # set mesh
         if mesh_type==MeshType.UNIT_SQUARE:

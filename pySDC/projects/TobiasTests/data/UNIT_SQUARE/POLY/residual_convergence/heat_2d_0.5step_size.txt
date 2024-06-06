@@ -1,2 +1,0 @@
-t: 0.00000000 | iteration:   1 | residual: 0.000000000000001
-t: 0.50000000 | iteration:   1 | residual: 0.000000000000000

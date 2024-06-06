@@ -3,7 +3,8 @@ from pySDC.helpers.visualization_tools import show_residual_across_simulation
 
 from pySDC.implementations.controller_classes.controller_nonMPI import controller_nonMPI
 from pySDC.implementations.sweeper_classes.imex_1st_order_mass import imex_1st_order_mass
-from pySDC.implementations.sweeper_classes.Runge_Kutta import RK4
+from pySDC.implementations.sweeper_classes.Runge_Kutta import RungeKuttaIMEX
+from pySDC.implementations.transfer_classes.TransferFenicsMesh import mesh_to_mesh_fenics
 from pySDC.projects.TobiasTests.Fenics_Heat_2D_custom import fenics_heat_2d_custom, MeshType, Equation
 
 import logging
@@ -64,8 +65,8 @@ def problem_setup(t0, dt, nspace, maxiter, restol, num_nodes, mesh_type, equatio
     description['sweeper_params'] = sweeper_params
     description['level_params'] = level_params
     description['step_params'] = step_params
-    #description['space_transfer_class'] = mesh_to_mesh_fenics
-    #description['base_transfer_params'] = base_transfer_params
+    description['space_transfer_class'] = mesh_to_mesh_fenics
+    description['base_transfer_params'] = base_transfer_params
 
     return description, controller_params
 
@@ -79,8 +80,8 @@ def main():
     
     # Plotting parameters
     plotting = False
-    vmin = 1.0
-    vmax = 7.0
+    vmin = 0.0
+    vmax = 1.0
     
     # Saves statistics about the execution to a file
     save_statistics = True
@@ -91,10 +92,10 @@ def main():
     Tend = 1.0
     timesteps = [2**i for i in range(2, 10)]
     nspace = 8
-    maxiter = 1
+    maxiter = 5
     restol = 1e-15
-    num_nodes = 3
-    mesh_type = MeshType.UNIT_SQUARE
+    num_nodes = 2
+    mesh_type = MeshType.RECTANGLE_2x1
     equation = Equation.TRIG
     
     
