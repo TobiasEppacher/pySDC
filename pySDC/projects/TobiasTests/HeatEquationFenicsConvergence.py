@@ -19,7 +19,7 @@ from dolfin import *
 def get_residuals(stats):
     residuals = []
     for key, value in stats.items():
-        if key.type == 'residual_post_sweep':
+        if key.type == 'residual_post_sweep' or key.type == 'residual_post_step':
             residuals.append((key.time, key.iter, value))
     
     residuals = sorted(residuals, key=lambda x: (x[0], x[1]))
@@ -65,8 +65,8 @@ def problem_setup(t0, dt, nspace, maxiter, restol, num_nodes, mesh_type, equatio
     description['sweeper_params'] = sweeper_params
     description['level_params'] = level_params
     description['step_params'] = step_params
-    description['space_transfer_class'] = mesh_to_mesh_fenics
-    description['base_transfer_params'] = base_transfer_params
+    #description['space_transfer_class'] = mesh_to_mesh_fenics
+    #description['base_transfer_params'] = base_transfer_params
 
     return description, controller_params
 
@@ -94,9 +94,9 @@ def main():
     nspace = 8
     maxiter = 5
     restol = 1e-15
-    num_nodes = 2
+    num_nodes = 1
     mesh_type = MeshType.RECTANGLE_2x1
-    equation = Equation.TRIG
+    equation = Equation.POLY_N
     
     
     description, controller_params = problem_setup(
@@ -171,7 +171,10 @@ def main():
             
             full_final_statistics['t_start'].append(curr_t)
             full_final_statistics['t_end'].append(curr_t + dt)
-            full_final_statistics['residual'].append(get_residuals(stats)[-1][2])
+            try:
+                full_final_statistics['residual'].append(get_residuals(stats)[-1][2])
+            except:
+                print(get_residuals(stats))
             full_final_statistics['err'].append(err)
             full_final_statistics['iter_mean'].append(np.mean(niters))
             full_final_statistics['iter_range'].append(np.ptp(niters))
