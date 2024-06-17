@@ -83,7 +83,7 @@ class fenics_heat_2d_custom(ptype):
         elif equation==Equation.POLY_N:
             self.d = 0
             self.a = self.b = 2
-            self.c = 8
+            self.c = 10
             self.u_D = df.Expression('d + pow(x[0], a) + pow(x[1], b) + pow(t, c)', degree=self.order, a=self.a, b=self.b, c=self.c, d=self.d, t=t0)
         elif equation==Equation.TRIG:
             self.u_D = Expression('sin(a*x[0])*sin(a*x[1])*cos(t)', a=np.pi, degree=self.order, t=t0)

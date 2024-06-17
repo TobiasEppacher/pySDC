@@ -92,9 +92,9 @@ def main():
     Tend = 1.0
     timesteps = [2**i for i in range(2, 10)]
     nspace = 8
-    maxiter = 5
-    restol = 1e-15
-    num_nodes = 1
+    maxiter = 10
+    restol = 1e-12
+    num_nodes_arr = [1, 2, 4, 8, 16]
     mesh_type = MeshType.RECTANGLE_2x1
     equation = Equation.POLY_N
     
@@ -105,7 +105,7 @@ def main():
         nspace=nspace, 
         maxiter=maxiter, 
         restol=restol, 
-        num_nodes=num_nodes, 
+        num_nodes=num_nodes_arr[0], 
         mesh_type=mesh_type, 
         equation=equation)
     
@@ -114,111 +114,115 @@ def main():
     print(f'Time interval: [{t0}, {Tend}]')
     print(f'Residual tolerance: {description["level_params"]["restol"]}')
     
-    file_dir = f'pySDC/projects/TobiasTests/data/{mesh_type.name}/{equation.name}/order{num_nodes}'
+    for num_nodes in num_nodes_arr:
     
-    convergence_data = {}
-    convergence_data['timesteps'] = []
-    convergence_data['final_residual'] = []
-    convergence_data['final_error'] = []
-    
-    for timestep_count in timesteps:
-        dt = (Tend - t0) / timestep_count
-        description['level_params']['dt'] = dt
-        print(f'\nNumber of time steps={timestep_count}')
-        print(f'Time step size dt={dt}')
+        file_dir = f'pySDC/projects/TobiasTests/data/{mesh_type.name}/{equation.name}/order{num_nodes}'
+        
+        convergence_data = {}
+        convergence_data['timesteps'] = []
+        convergence_data['final_residual'] = []
+        convergence_data['final_error'] = []
+        
+        description['sweeper_params']['num_nodes'] = num_nodes
+        
+        for timestep_count in timesteps:
+            dt = (Tend - t0) / timestep_count
+            description['level_params']['dt'] = dt
+            print(f'\nNumber of time steps={timestep_count}')
+            print(f'Time step size dt={dt}')
 
-        full_final_statistics = {}
-        full_final_statistics['t_start'] = []
-        full_final_statistics['t_end'] = []
-        full_final_statistics['residual'] = []
-        full_final_statistics['err'] = []
-        full_final_statistics['iter_mean'] = []
-        full_final_statistics['iter_range'] = []
-        full_final_statistics['iter_max_index'] = []
-        full_final_statistics['iter_min_index'] = []
-        full_final_statistics['iter_std'] = []
-        full_final_statistics['iter_var'] = []
-        full_final_statistics['time_to_solution'] = []
-        
-        
-        controller = controller_nonMPI(num_procs=1, controller_params=controller_params, description=description)
-        P = controller.MS[0].levels[0].prob
-        print(f'Fenics DoFs: {P.getDofCount()}')
-        
-        uinit = P.u_exact(t0)
-        
-        ex_solution_arr = [uinit]
-        solution_arr = [uinit]
-        
-        if plotting:
-            fig = plt.figure(figsize=(5, 10))
-            fig.add_subplot(3,1,1)
-            p = plot(uinit.values, title='Initial condition', vmin=vmin, vmax=vmax, cmap='coolwarm')
-            fig.colorbar(p)
+            full_final_statistics = {}
+            full_final_statistics['t_start'] = []
+            full_final_statistics['t_end'] = []
+            full_final_statistics['residual'] = []
+            full_final_statistics['err'] = []
+            full_final_statistics['iter_mean'] = []
+            full_final_statistics['iter_range'] = []
+            full_final_statistics['iter_max_index'] = []
+            full_final_statistics['iter_min_index'] = []
+            full_final_statistics['iter_std'] = []
+            full_final_statistics['iter_var'] = []
+            full_final_statistics['time_to_solution'] = []
             
-        curr_t = t0
-        while curr_t < Tend:           
-            uend, stats = controller.run(u0=solution_arr[-1], t0=curr_t, Tend=curr_t+dt)
-            solution_arr.append(uend)
             
-            uex = P.u_exact(curr_t+dt)
-            ex_solution_arr.append(uex)
+            controller = controller_nonMPI(num_procs=1, controller_params=controller_params, description=description)
+            P = controller.MS[0].levels[0].prob
+            print(f'Fenics DoFs: {P.getDofCount()}')
             
-            err = abs(uex - uend) / abs(uex)
+            uinit = P.u_exact(t0)
             
-            iter_counts = get_sorted(stats, type='niter', sortby='time')
-            niters = np.array([item[1] for item in iter_counts])
+            ex_solution_arr = [uinit]
+            solution_arr = [uinit]
             
-            full_final_statistics['t_start'].append(curr_t)
-            full_final_statistics['t_end'].append(curr_t + dt)
-            try:
-                full_final_statistics['residual'].append(get_residuals(stats)[-1][2])
-            except:
-                print(get_residuals(stats))
-            full_final_statistics['err'].append(err)
-            full_final_statistics['iter_mean'].append(np.mean(niters))
-            full_final_statistics['iter_range'].append(np.ptp(niters))
-            full_final_statistics['iter_max_index'].append(int(np.argmax(niters)))
-            full_final_statistics['iter_min_index'].append(int(np.argmin(niters)))
-            full_final_statistics['iter_std'].append(float(np.std(niters)))
-            full_final_statistics['iter_var'].append(float(np.var(niters)))
-            full_final_statistics['time_to_solution'].append(get_sorted(stats, type='timing_run', sortby='time')[0][1])
+            if plotting:
+                fig = plt.figure(figsize=(5, 10))
+                fig.add_subplot(3,1,1)
+                p = plot(uinit.values, title='Initial condition', vmin=vmin, vmax=vmax, cmap='coolwarm')
+                fig.colorbar(p)
+                
+            curr_t = t0
+            while curr_t < Tend:           
+                uend, stats = controller.run(u0=solution_arr[-1], t0=curr_t, Tend=curr_t+dt)
+                solution_arr.append(uend)
+                
+                uex = P.u_exact(curr_t+dt)
+                ex_solution_arr.append(uex)
+                
+                err = abs(uex - uend) / abs(uex)
+                
+                iter_counts = get_sorted(stats, type='niter', sortby='time')
+                niters = np.array([item[1] for item in iter_counts])
+                
+                full_final_statistics['t_start'].append(curr_t)
+                full_final_statistics['t_end'].append(curr_t + dt)
+                try:
+                    full_final_statistics['residual'].append(get_residuals(stats)[-1][2])
+                except:
+                    print(get_residuals(stats))
+                full_final_statistics['err'].append(err)
+                full_final_statistics['iter_mean'].append(np.mean(niters))
+                full_final_statistics['iter_range'].append(np.ptp(niters))
+                full_final_statistics['iter_max_index'].append(int(np.argmax(niters)))
+                full_final_statistics['iter_min_index'].append(int(np.argmin(niters)))
+                full_final_statistics['iter_std'].append(float(np.std(niters)))
+                full_final_statistics['iter_var'].append(float(np.var(niters)))
+                full_final_statistics['time_to_solution'].append(get_sorted(stats, type='timing_run', sortby='time')[0][1])
+                
+                curr_t += dt
+                
+            convergence_data['timesteps'].append(timestep_count)
+            convergence_data['final_residual'].append(full_final_statistics['residual'][-1])
+            convergence_data['final_error'].append(full_final_statistics['err'][-1])          
+                
+            if plotting:
+                fig.add_subplot(3,1,2)
+                p = plot(uend.values, title='Computed solution', vmin=vmin, vmax=vmax, cmap='coolwarm')
+                fig.colorbar(p)
+                fig.add_subplot(3,1,3)
+                p = plot(uex.values, title='Exact solution', vmin=vmin, vmax=vmax, cmap='coolwarm')
+                fig.colorbar(p)
+                plt.show()
+                
+            if save_statistics:
+                # Save full execution statistics to seperate file for each time step count / time step size
+                # This includes data like residual, error, time to solution etc. for each time step
+                Path(f'{file_dir}/statistics').mkdir(exist_ok=True, parents=True)
+                fname = f'{file_dir}/statistics/heat_2d_{dt}step_size.csv'
+                f = open(fname, 'w')
+                
+                df = pd.DataFrame.from_dict(full_final_statistics)
+                df.to_csv(f, index=False)
             
-            curr_t += dt
             
-        convergence_data['timesteps'].append(timestep_count)
-        convergence_data['final_residual'].append(full_final_statistics['residual'][-1])
-        convergence_data['final_error'].append(full_final_statistics['err'][-1])          
-            
-        if plotting:
-            fig.add_subplot(3,1,2)
-            p = plot(uend.values, title='Computed solution', vmin=vmin, vmax=vmax, cmap='coolwarm')
-            fig.colorbar(p)
-            fig.add_subplot(3,1,3)
-            p = plot(uex.values, title='Exact solution', vmin=vmin, vmax=vmax, cmap='coolwarm')
-            fig.colorbar(p)
-            plt.show()
-            
-        if save_statistics:
-            # Save full execution statistics to seperate file for each time step count / time step size
-            # This includes data like residual, error, time to solution etc. for each time step
-            Path(f'{file_dir}/statistics').mkdir(exist_ok=True, parents=True)
-            fname = f'{file_dir}/statistics/heat_2d_{dt}step_size.csv'
+        # Save convergence data (final residual and error for each time step count)
+        # to file for further analysis
+        if save_statistics:       
+            Path(file_dir).mkdir(exist_ok=True, parents=True)
+            fname = f'{file_dir}/convergence_data.csv'
             f = open(fname, 'w')
             
-            df = pd.DataFrame.from_dict(full_final_statistics)
+            df = pd.DataFrame.from_dict(convergence_data)
             df.to_csv(f, index=False)
-        
-        
-    # Save convergence data (final residual and error for each time step count)
-    # to file for further analysis
-    if save_statistics:       
-        Path(file_dir).mkdir(exist_ok=True, parents=True)
-        fname = f'{file_dir}/convergence_data.csv'
-        f = open(fname, 'w')
-        
-        df = pd.DataFrame.from_dict(convergence_data)
-        df.to_csv(f, index=False)
     
     return 0
 
