@@ -1,10 +1,7 @@
 from pySDC.helpers.stats_helper import get_sorted
-from pySDC.helpers.visualization_tools import show_residual_across_simulation
 
 from pySDC.implementations.controller_classes.controller_nonMPI import controller_nonMPI
 from pySDC.implementations.sweeper_classes.imex_1st_order_mass import imex_1st_order_mass
-from pySDC.implementations.sweeper_classes.Runge_Kutta import RungeKuttaIMEX
-from pySDC.implementations.transfer_classes.TransferFenicsMesh import mesh_to_mesh_fenics
 from pySDC.projects.TobiasTests.Fenics_Heat_2D_custom import fenics_heat_2d_custom, MeshType, Equation
 
 import logging
@@ -94,7 +91,7 @@ def main():
     nspace = 8
     maxiter = 10
     restol = 1e-12
-    num_nodes_arr = [1, 2, 4, 8, 16]
+    num_nodes_arr = [1, 2, 4, 8]
     mesh_type = MeshType.RECTANGLE_2x1
     equation = Equation.POLY_N
     
