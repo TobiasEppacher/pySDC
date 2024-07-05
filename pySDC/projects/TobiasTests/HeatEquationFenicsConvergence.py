@@ -87,13 +87,14 @@ def main():
     # For more detailed parameters, adjust the problem_setup function
     t0 = 0.0
     Tend = 1.0
-    timesteps = [2**i for i in range(2, 10)]
+    timesteps = [2**i for i in range(2, 9)]
     nspace = 8
     maxiter = 10
     restol = 1e-12
     num_nodes_arr = [1, 2, 4, 8]
     mesh_type = MeshType.RECTANGLE_2x1
     equation = Equation.POLY_N
+    
     
     
     description, controller_params = problem_setup(
@@ -162,10 +163,19 @@ def main():
                 uend, stats = controller.run(u0=solution_arr[-1], t0=curr_t, Tend=curr_t+dt)
                 solution_arr.append(uend)
                 
-                uex = P.u_exact(curr_t+dt)
-                ex_solution_arr.append(uex)
+                u_ref = P.u_exact(curr_t+dt)
+                ex_solution_arr.append(u_ref)
                 
-                err = abs(uex - uend) / abs(uex)
+                #L_inf error
+                #err = abs(uex - uend) / abs(uex)
+                
+                #L_2 error
+                v = P.V
+                error_normalized = (u_ref.values - uend.values) / u_ref.values
+                # project onto function space
+                error_pointwise = project(abs(error_normalized), v)
+                # determine L2 norm to estimate total error
+                err = sqrt(assemble(inner(error_pointwise, error_pointwise) * dx))
                 
                 iter_counts = get_sorted(stats, type='niter', sortby='time')
                 niters = np.array([item[1] for item in iter_counts])
@@ -196,7 +206,7 @@ def main():
                 p = plot(uend.values, title='Computed solution', vmin=vmin, vmax=vmax, cmap='coolwarm')
                 fig.colorbar(p)
                 fig.add_subplot(3,1,3)
-                p = plot(uex.values, title='Exact solution', vmin=vmin, vmax=vmax, cmap='coolwarm')
+                p = plot(u_ref.values, title='Exact solution', vmin=vmin, vmax=vmax, cmap='coolwarm')
                 fig.colorbar(p)
                 plt.show()
                 

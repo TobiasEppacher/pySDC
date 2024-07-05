@@ -81,10 +81,12 @@ class fenics_heat_2d_custom(ptype):
             self.beta = 1.2
             self.u_D = Expression('1 + x[0]*x[0] + alpha*x[1]*x[1] + beta*t', degree=self.order, alpha=self.alpha, beta=self.beta, t=t0)
         elif equation==Equation.POLY_N:
+            self.alpha = 3
+            self.beta = 1.2
             self.d = 0
             self.a = self.b = 2
             self.c = 10
-            self.u_D = df.Expression('d + pow(x[0], a) + pow(x[1], b) + pow(t, c)', degree=self.order, a=self.a, b=self.b, c=self.c, d=self.d, t=t0)
+            self.u_D = df.Expression('d + pow(x[0], a) + alpha*pow(x[1], b) + beta*pow(t, c)', degree=self.order, a=self.a, b=self.b, c=self.c, d=self.d, alpha=self.alpha, beta=self.beta, t=t0)
         elif equation==Equation.TRIG:
             self.u_D = Expression('sin(a*x[0])*sin(a*x[1])*cos(t)', a=np.pi, degree=self.order, t=t0)
         elif equation==Equation.MIXED: 
@@ -111,7 +113,7 @@ class fenics_heat_2d_custom(ptype):
         if equation==Equation.POLY:
             self.g = df.Expression('beta - 2 - 2 * alpha', degree=self.order, alpha=self.alpha, beta=self.beta, t=t0)
         elif equation==Equation.POLY_N:
-            self.g = df.Expression('c*pow(t,(c-1)) - (a*a - a)*pow(x[0],(a-2)) - (b*b - b)*pow(x[1],(b-2))', degree=self.order, a=self.a, b=self.b, c=self.c, t=t0)
+            self.g = df.Expression('beta*c*pow(t,(c-1)) - a*(a-1)*pow(x[0],(a-2)) - alpha*b*(b-1)*pow(x[1],(b-2))', degree=self.order, a=self.a, b=self.b, c=self.c, alpha=self.alpha, beta=self.beta, t=t0)
         elif equation==Equation.TRIG:
             self.g = df.Expression('sin(a*x[0])*sin(a*x[1])*(2*a*a*cos(t)-sin(t))', degree=self.order, a=np.pi, t=t0)
         elif equation==Equation.MIXED:
@@ -180,7 +182,7 @@ class fenics_heat_2d_custom(ptype):
         if self.equation==Equation.POLY:
             u_exact = Expression('1 + x[0]*x[0] + alpha*x[1]*x[1] + beta*t', degree=self.order, alpha=self.alpha, beta=self.beta, t=t)
         elif self.equation==Equation.POLY_N:
-            u_exact = df.Expression('d + pow(x[0], a) + pow(x[1], b) + pow(t, c)', degree=self.order, a=self.a, b=self.b, c=self.c, d=self.d, t=t)
+            u_exact = Expression('d + pow(x[0], a) + alpha*pow(x[1], b) + beta*pow(t, c)', degree=self.order, a=self.a, b=self.b, c=self.c, d=self.d, alpha=self.alpha, beta=self.beta, t=t)
         elif self.equation==Equation.TRIG:
             u_exact = Expression('sin(a*x[0])*sin(a*x[1])*cos(t)', a=np.pi, degree=self.order, t=t)
         elif self.equation==Equation.MIXED:
@@ -196,3 +198,6 @@ class fenics_heat_2d_custom(ptype):
         
         me = self.dtype_u(interpolate(u_exact, self.V), val=self.V)
         return me
+    
+    def getFunctionSpace(self):
+        return self.V
